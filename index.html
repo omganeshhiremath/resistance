@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OhmScan — Resistor Color Code Image Calculator</title>
+  <style>
+    :root {
+      --bg: #0b0e17;
+      --card: #131826;
+      --card-elevated: #1b2236;
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f3f6fc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #818cf8;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top right, #172038, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px 16px 48px;
+    }
+
+    .container {
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 5px 12px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 840px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Upload Dropzone */
+    .upload-zone {
+      border: 2px dashed rgba(56, 189, 248, 0.4);
+      background: rgba(56, 189, 248, 0.05);
+      border-radius: 16px;
+      padding: 22px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.2s ease;
+      margin-bottom: 14px;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.12);
+    }
+
+    .upload-zone strong {
+      display: block;
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+
+    .upload-zone span {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .sample-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .btn-sm {
+      background: var(--card-elevated);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 11px;
+      border-radius: 9px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+
+    .btn-sm:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #06101d;
+      border: none;
+      padding: 9px 14px;
+      border-radius: 10px;
+      font-size: 0.84rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* Canvas Workspace */
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      background: #070a11;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    canvas#resistorCanvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: crosshair;
+    }
+
+    .canvas-hint {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .eyedropper-banner {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: #fcd34d;
+      font-size: 0.82rem;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .eyedropper-banner.active {
+      display: flex;
+    }
+
+    /* Result Display */
+    .result-hero {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(129, 140, 248, 0.16));
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 16px;
+      padding: 18px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .result-label {
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .result-value {
+      font-size: 2.3rem;
+      font-weight: 900;
+      margin: 4px 0;
+      letter-spacing: -0.02em;
+    }
+
+    .result-sub {
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    /* Live Visual Resistor Preview */
+    .resistor-preview-box {
+      background: #0a0e18;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .segmented {
+      display: flex;
+      background: var(--card-elevated);
+      border-radius: 10px;
+      padding: 3px;
+      border: 1px solid var(--border);
+    }
+
+    .segmented button {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .segmented button.active {
+      background: var(--accent);
+      color: #06101d;
+    }
+
+    /* Band Selectors */
+    .bands-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .band-row {
+      display: grid;
+      grid-template-columns: 95px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      background: var(--card-elevated);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 12px;
+    }
+
+    .band-row label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .band-select-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .swatch-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255, 255, 255, 0.45);
+      flex-shrink: 0;
+    }
+
+    select.band-select {
+      width: 100%;
+      background: #0d121f;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      outline: none;
+    }
+
+    .pick-btn {
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--accent);
+      padding: 5px 8px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .pick-btn.active {
+      background: var(--warning);
+      color: #000;
+      border-color: var(--warning);
+    }
+
+    .detected-swatches {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .raw-chips {
+      display: flex;
+      gap: 6px;
+    }
+
+    .raw-chip {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">⚡ COMPUTER VISION + MANUAL EYEDROPPER</div>
+      <h1>Resistor Image Resistance Calculator</h1>
+      <p>Upload a photo of any 4-band or 5-band axial resistor to detect its color bands and calculate resistance instantly.</p>
+    </header>
+
+    <div class="main-grid">
+      <!-- LEFT: Image Upload & Interactive Scanner -->
+      <section class="card">
+        <div class="card-title">
+          <span>1. Upload & Scan Resistor Image</span>
+          <button type="button" class="btn-primary" id="rescanBtn">🔍 Auto-Detect Bands</button>
+        </div>
+
+        <div class="upload-zone" id="uploadZone">
+          <strong>📸 Click to Upload or Take Photo of Resistor</strong>
+          <span>Supports JPG, PNG, WebP • Or drag and drop an image here</span>
+          <input type="file" id="imageInput" accept="image/*" capture="environment" hidden />
+        </div>
+
+        <div class="sample-bar">
+          <span>Test with sample images:</span>
+          <button type="button" class="btn-sm" data-sample="4.7k">4.7 kΩ (4-Band)</button>
+          <button type="button" class="btn-sm" data-sample="10k">10 kΩ (4-Band)</button>
+          <button type="button" class="btn-sm" data-sample="220-5">220 Ω (5-Band)</button>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="resistorCanvas" width="640" height="360"></canvas>
+        </div>
+
+        <div class="eyedropper-banner" id="eyedropperBanner">
+          <span id="eyedropperText">🎯 Tap directly on Band 1 in the image above...</span>
+          <button type="button" class="btn-sm" id="cancelPickBtn">Cancel</button>
+        </div>
+
+        <div class="canvas-hint">
+          <span>💡 Drag the blue handles <strong>(A — B)</strong> across the resistor body from left to right.</span>
+          <span id="scanStatusText">Ready</span>
+        </div>
+      </section>
+
+      <!-- RIGHT: Calculated Resistance & Band Fine-Tuning -->
+      <section class="card">
+        <div class="card-title">
+          <span>2. Calculated Resistance</span>
+          <button type="button" class="btn-sm" id="flipBandsBtn" title="Reverse band order">⇄ Flip Ends</button>
+        </div>
+
+        <div class="result-hero">
+          <div class="result-label">RESISTANCE VALUE</div>
+          <div class="result-value" id="resistanceOutput">4.7 kΩ ±5%</div>
+          <div class="result-sub" id="rangeOutput">Acceptable Range: 4.465 kΩ – 4.935 kΩ</div>
+        </div>
+
+        <div class="resistor-preview-box">
+          <svg id="resistorSvg" viewBox="0 0 360 90" width="100%" height="76"></svg>
+        </div>
+
+        <div class="controls-row">
+          <div class="segmented">
+            <button type="button" id="mode4Btn" class="active">4-Band</button>
+            <button type="button" id="mode5Btn">5-Band</button>
+          </div>
+          <span style="font-size: 0.78rem; color: var(--muted);">Click <strong>🎯 Pick</strong> to sample from photo</span>
+        </div>
+
+        <div class="bands-list" id="bandsContainer"></div>
+
+        <div class="detected-swatches">
+          <span>Detected raw pixel colors:</span>
+          <div class="raw-chips" id="rawChipsContainer"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const COLOR_TABLE = [
+      { key: "black",  name: "Black",  hex: "#18181b", rgb: [24, 24, 27],    digit: 0, mult: 1,          tol: null },
+      { key: "brown",  name: "Brown",  hex: "#78350f", rgb: [120, 53, 15],   digit: 1, mult: 10,         tol: 1 },
+      { key: "red",    name: "Red",    hex: "#dc2626", rgb: [220, 38, 38],   digit: 2, mult: 100,        tol: 2 },
+      { key: "orange", name: "Orange", hex: "#f97316", rgb: [249, 115, 22],  digit: 3, mult: 1000,       tol: null },
+      { key: "yellow", name: "Yellow", hex: "#eab308", rgb: [234, 179, 8],   digit: 4, mult: 10000,      tol: null },
+      { key: "green",  name: "Green",  hex: "#16a34a", rgb: [22, 163, 74],   digit: 5, mult: 100000,     tol: 0.5 },
+      { key: "blue",   name: "Blue",   hex: "#2563eb", rgb: [37, 99, 235],   digit: 6, mult: 1000000,    tol: 0.25 },
+      { key: "violet", name: "Violet", hex: "#7c3aed", rgb: [124, 58, 237],  digit: 7, mult: 10000000,   tol: 0.1 },
+      { key: "grey",   name: "Grey",   hex: "#6b7280", rgb: [107, 114, 128], digit: 8, mult: 100000000,  tol: 0.05 },
+      { key: "white",  name: "White",  hex: "#f8fafc", rgb: [248, 250, 252], digit: 9, mult: 1000000000, tol: null },
+      { key: "gold",   name: "Gold",   hex: "#d4af37", rgb: [212, 175, 55],  digit: null, mult: 0.1,     tol: 5 },
+      { key: "silver", name: "Silver", hex: "#cbd5e1", rgb: [203, 213, 225], digit: null, mult: 0.01,    tol: 10 }
+    ];
+
+    const canvas = document.getElementById("resistorCanvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const offscreen = document.createElement("canvas");
+    const offCtx = offscreen.getContext("2d", { willReadFrequently: true });
+
+    let bandCount = 4;
+    let selectedBands = ["yellow", "violet", "red", "gold"]; // Default 4.7k
+    let detectedRawColors = [];
+    let pickingBandIndex = null;
+    let pointerPos = null;
+
+    // Scan line endpoints in canvas coordinates
+    let p1 = { x: 165, y: 180 };
+    let p2 = { x: 475, y: 180 };
+    let draggingHandle = null;
+
+    // Upload handlers
+    const uploadZone = document.getElementById("uploadZone");
+    const imageInput = document.getElementById("imageInput");
+
+    uploadZone.addEventListener("click", () => imageInput.click());
+    uploadZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      uploadZone.classList.add("dragover");
+    });
+    uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
+    uploadZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove("dragover");
+      if (e.dataTransfer.files[0]) loadUploadedFile(e.dataTransfer.files[0]);
+    });
+    imageInput.addEventListener("change", (e) => {
+      if (e.target.files[0]) loadUploadedFile(e.target.files[0]);
+    });
+
+    function loadUploadedFile(file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 760;
+          const scale = Math.min(1, maxW / img.width);
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          offscreen.width = canvas.width;
+          offscreen.height = canvas.height;
+          offCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          p1 = { x: Math.round(canvas.width * 0.24), y: Math.round(canvas.height * 0.5) };
+          p2 = { x: Math.round(canvas.width * 0.76), y: Math.round(canvas.height * 0.5) };
+
+          detectBandsFromScanLine();
+          drawCanvas();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Generate realistic sample resistor images on canvas for instant testing
+    function loadSampleResistor(type) {
+      canvas.width = 640;
+      canvas.height = 360;
+      offscreen.width = 640;
+      offscreen.height = 360;
+
+      // Studio mat background
+      offCtx.fillStyle = "#141b29";
+      offCtx.fillRect(0, 0, 640, 360);
+
+      // Subtle grid
+      offCtx.strokeStyle = "rgba(255,255,255,0.04)";
+      for (let x = 0; x < 640; x += 24) {
+        offCtx.beginPath(); offCtx.moveTo(x, 0); offCtx.lineTo(x, 360); offCtx.stroke();
+      }
+      for (let y = 0; y < 360; y += 24) {
+        offCtx.beginPath(); offCtx.moveTo(0, y); offCtx.lineTo(640, y); offCtx.stroke();
+      }
+
+      // Metal leads
+      const leadGrad = offCtx.createLinearGradient(0, 174, 0, 186);
+      leadGrad.addColorStop(0, "#64748b");
+      leadGrad.addColorStop(0.5, "#e2e8f0");
+      leadGrad.addColorStop(1, "#475569");
+      offCtx.fillStyle = leadGrad;
+      offCtx.fillRect(50, 175, 540, 10);
+
+      let bodyColorTop = "#e2c391";
+      let bodyColorBot = "#b8925a";
+      let bands = ["#eab308", "#7c3aed", "#dc2626", "#d4af37"]; // 4.7k
+
+      if (type === "10k") {
+        bands = ["#78350f", "#18181b", "#f97316", "#d4af37"];
+      } else if (type === "220-5") {
+        bodyColorTop = "#7dd3fc";
+        bodyColorBot = "#0284c7";
+        bands = ["#dc2626", "#dc2626", "#18181b", "#18181b", "#78350f"];
+      }
+
+      // Resistor ceramic body
+      const bodyGrad = offCtx.createLinearGradient(0, 130, 0, 230);
+      bodyGrad.addColorStop(0, bodyColorTop);
+      bodyGrad.addColorStop(0.35, "#f8fafc44");
+      bodyGrad.addColorStop(1, bodyColorBot);
+
+      offCtx.fillStyle = bodyColorTop;
+      roundRect(offCtx, 165, 130, 310, 100, 28);
+      offCtx.fill();
+
+      // Draw color bands
+      const positions = bands.length === 5 ? [210, 255, 300, 345, 415] : [215, 268, 322, 410];
+      bands.forEach((hex, idx) => {
+        offCtx.fillStyle = hex;
+        offCtx.fillRect(positions[idx], 130, 18, 100);
+      });
+
+      // Cylindrical lighting overlay
+      const gloss = offCtx.createLinearGradient(0, 130, 0, 230);
+      gloss.addColorStop(0, "rgba(0,0,0,0.22)");
+      gloss.addColorStop(0.28, "rgba(255,255,255,0.28)");
+      gloss.addColorStop(0.65, "rgba(0,0,0,0.05)");
+      gloss.addColorStop(1, "rgba(0,0,0,0.38)");
+      offCtx.fillStyle = gloss;
+      roundRect(offCtx, 165, 130, 310, 100, 28);
+      offCtx.fill();
+
+      p1 = { x: 185, y: 180 };
+      p2 = { x: 455, y: 180 };
+
+      detectBandsFromScanLine();
+      drawCanvas();
+    }
+
+    function roundRect(context, x, y, w, h, r) {
+      context.beginPath();
+      context.moveTo(x + r, y);
+      context.arcTo(x + w, y, x + w, y + h, r);
+      context.arcTo(x + w, y + h, x, y + h, r);
+      context.arcTo(x, y + h, x, y, r);
+      context.arcTo(x, y, x + w, y, r);
+      context.closePath();
+    }
+
+    // Color Space Conversion & Perceptual Classification
+    function rgbToHsv(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const d = max - min;
+      let h = 0;
+      const s = max === 0 ? 0 : d / max;
+      const v = max;
+
+      if (d !== 0) {
+        switch (max) {
+          case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
+          case g: h = ((b - r) / d + 2); break;
+          case b: h = ((r - g) / d + 4); break;
+        }
+        h *= 60;
+      }
+      return { h, s, v };
+    }
+
+    function classifyRgbToBand(rgb, role = "digit") {
+      const [r, g, b] = rgb;
+      const { h, s, v } = rgbToHsv(r, g, b);
+
+      let guess = "brown";
+
+      if (v < 0.23) {
+        guess = "black";
+      } else if (s < 0.22) {
+        if (v > 0.84) guess = "white";
+        else if (v > 0.60) guess = "silver";
+        else guess = "grey";
+      } else {
+        // Chromatic colors
+        if (h >= 340 || h < 12) {
+          guess = v < 0.48 ? "brown" : "red";
+        } else if (h >= 12 && h < 28) {
+          if (v < 0.52) guess = "brown";
+          else guess = "orange";
+        } else if (h >= 28 && h < 48) {
+          if (s < 0.68 && v < 0.82) guess = "gold";
+          else if (v < 0.50) guess = "brown";
+          else guess = "yellow";
+        } else if (h >= 48 && h < 70) {
+          guess = (s < 0.55 && v < 0.78) ? "gold" : "yellow";
+        } else if (h >= 70 && h < 168) {
+          guess = "green";
+        } else if (h >= 168 && h < 252) {
+          guess = "blue";
+        } else {
+          guess = "violet";
+        }
+      }
+
+      // Enforce valid band role constraints
+      const validKeys = getValidColorsForIndex(
+        role === "digit" ? 0 : role === "mult" ? bandCount - 2 : bandCount - 1,
+        bandCount
+      ).map(c => c.key);
+
+      if (validKeys.includes(guess)) return guess;
+
+      // Fallback nearest RGB among valid colors for that band slot
+      let bestKey = validKeys[0];
+      let bestDist = Infinity;
+      for (const k of validKeys) {
+        const c = COLOR_TABLE.find(item => item.key === k);
+        const dist = Math.hypot(r - c.rgb[0], g - c.rgb[1], b - c.rgb[2]);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestKey = k;
+        }
+      }
+      return bestKey;
+    }
+
+    // Computer-Vision Scan Line Band Detector
+    function detectBandsFromScanLine() {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 30) return;
+
+      const steps = Math.min(260, Math.floor(len));
+      const nx = -dy / len;
+      const ny = dx / len;
+      const samples = [];
+
+      // Sample averaged perpendicular strip along scan line to suppress glare/noise
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = p1.x + dx * t;
+        const cy = p1.y + dy * t;
+        let rSum = 0, gSum = 0, bSum = 0, count = 0;
+
+        for (let offset = -3; offset <= 3; offset++) {
+          const sx = Math.round(cx + nx * offset);
+          const sy = Math.round(cy + ny * offset);
+          if (sx >= 0 && sx < offscreen.width && sy >= 0 && sy < offscreen.height) {
+            const d = offCtx.getImageData(sx, sy, 1, 1).data;
+            rSum += d[0]; gSum += d[1]; bSum += d[2];
+            count++;
+          }
+        }
+        if (count > 0) {
+          samples.push([Math.round(rSum / count), Math.round(gSum / count), Math.round(bSum / count)]);
+        }
+      }
+
+      if (samples.length < 20) return;
+
+      // Estimate resistor body background color using median RGB across scan line
+      const sortedR = [...samples].map(s => s[0]).sort((a, b) => a - b);
+      const sortedG = [...samples].map(s => s[1]).sort((a, b) => a - b);
+      const sortedB = [...samples].map(s => s[2]).sort((a, b) => a - b);
+      const mid = Math.floor(samples.length / 2);
+      const bgRgb = [sortedR[mid], sortedG[mid], sortedB[mid]];
+
+      // Measure color difference from background body
+      const diffs = samples.map(s => Math.hypot(s[0] - bgRgb[0], s[1] - bgRgb[1], s[2] - bgRgb[2]));
+      const sortedDiffs = [...diffs].sort((a, b) => a - b);
+      const threshold = Math.max(32, sortedDiffs[Math.floor(diffs.length * 0.62)]);
+
+      // Segment contiguous non-background runs into bands
+      const segments = [];
+      let currentRun = [];
+
+      for (let i = 0; i < samples.length; i++) {
+        if (diffs[i] > threshold) {
+          currentRun.push({ idx: i, rgb: samples[i], diff: diffs[i] });
+        } else if (currentRun.length > 0) {
+          if (currentRun.length >= 2) segments.push(currentRun);
+          currentRun = [];
+        }
+      }
+      if (currentRun.length >= 2) segments.push(currentRun);
+
+      // Keep top N strongest segments if extra noise spikes occurred
+      let chosen = segments;
+      if (chosen.length > 5) {
+        chosen = [...chosen]
+          .sort((a, b) => b.length - a.length)
+          .slice(0, 5)
+          .sort((a, b) => a[0].idx - b[0].idx);
+      }
+
+      if (chosen.length >= 4) {
+        if (chosen.length === 5 && bandCount !== 5) {
+          bandCount = 5;
+          updateModeButtons();
+        } else if (chosen.length === 4 && bandCount !== 4) {
+          bandCount = 4;
+          updateModeButtons();
+        }
+
+        const activeCount = Math.min(bandCount, chosen.length);
+        const extracted = [];
+
+        for (let i = 0; i < activeCount; i++) {
+          const seg = chosen[i];
+          // Take center pixels of band to avoid edge anti-aliasing
+          const core = seg.slice(Math.floor(seg.length * 0.2), Math.max(1, Math.ceil(seg.length * 0.8)));
+          const avg = core.reduce(
+            (acc, item) => [acc[0] + item.rgb[0], acc[1] + item.rgb[1], acc[2] + item.rgb[2]],
+            [0, 0, 0]
+          ).map(v => Math.round(v / core.length));
+          extracted.push(avg);
+        }
+
+        detectedRawColors = extracted;
+
+        // Check if first band looks like Gold/Silver tolerance band -> auto flip
+        const firstGuess = classifyRgbToBand(extracted[0], "tol");
+        if ((firstGuess === "gold" || firstGuess === "silver") && extracted.length >= 4) {
+          extracted.reverse();
+          detectedRawColors = extracted;
+        }
+
+        selectedBands = extracted.map((rgb, idx) => {
+          if (idx === extracted.length - 1) return classifyRgbToBand(rgb, "tol");
+          if (idx === extracted.length - 2) return classifyRgbToBand(rgb, "mult");
+          return classifyRgbToBand(rgb, "digit");
+        });
+
+        document.getElementById("scanStatusText").textContent = `Detected ${selectedBands.length} bands`;
+        renderBandControls();
+        calculateAndRender();
+      } else {
+        document.getElementById("scanStatusText").textContent = "Adjust scan line across bands or use 🎯 Pick";
+      }
+    }
+
+    // Draw uploaded image + interactive scan line + optional eyedropper loupe
+    function drawCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(offscreen, 0, 0);
+
+      // Scan line shadow + bright line
+      ctx.save();
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.65)";
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+
+      ctx.strokeStyle = "#38bdf8";
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw draggable endpoints A and B
+      drawHandle(p1.x, p1.y, "A");
+      drawHandle(p2.x, p2.y, "B");
+
+      // Magnified Eyedropper Loupe when picking a band color
+      if (pickingBandIndex !== null && pointerPos) {
+        const r = 34;
+        const lx = Math.min(canvas.width - r - 10, Math.max(r + 10, pointerPos.x));
+        const ly = Math.max(r + 10, pointerPos.y - 52);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(lx, ly, r, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(
+          offscreen,
+          pointerPos.x - 10, pointerPos.y - 10, 20, 20,
+          lx - r, ly - r, r * 2, r * 2
+        );
+        ctx.restore();
+
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(lx, ly, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Crosshair dot
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(lx - 2, ly - 2, 4, 4);
+      }
+      ctx.restore();
+    }
+
+    function drawHandle(x, y, label) {
+      ctx.fillStyle = "#38bdf8";
+      ctx.beginPath();
+      ctx.arc(x, y, 11, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#06101d";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = "#06101d";
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x, y + 0.5);
+    }
+
+    // Pointer Events for Scan Line Dragging & Eyedropper Sampling
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: ((e.clientX - rect.left) / rect.width) * canvas.width,
+        y: ((e.clientY - rect.top) / rect.height) * canvas.height
+      };
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+      const pos = getCanvasCoords(e);
+
+      // Eyedropper mode active
+      if (pickingBandIndex !== null) {
+        const px = Math.min(offscreen.width - 1, Math.max(0, Math.round(pos.x)));
+        const py = Math.min(offscreen.height - 1, Math.max(0, Math.round(pos.y)));
+        const data = offCtx.getImageData(px, py, 1, 1).data;
+        const rgb = [data[0], data[1], data[2]];
+
+        const role =
+          pickingBandIndex === bandCount - 1 ? "tol" :
+          pickingBandIndex === bandCount - 2 ? "mult" : "digit";
+
+        selectedBands[pickingBandIndex] = classifyRgbToBand(rgb, role);
+        detectedRawColors[pickingBandIndex] = rgb;
+        stopEyedropper();
+        renderBandControls();
+        calculateAndRender();
+        drawCanvas();
+        return;
+      }
+
+      if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 22) {
+        draggingHandle = "p1";
+        canvas.setPointerCapture(e.pointerId);
+      } else if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 22) {
+        draggingHandle = "p2";
+        canvas.setPointerCapture(e.pointerId);
+      }
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      const pos = getCanvasCoords(e);
+      pointerPos = pos;
+
+      if (draggingHandle === "p1") {
+        p1.x = Math.max(8, Math.min(canvas.width - 8, pos.x));
+        p1.y = Math.max(8, Math.min(canvas.height - 8, pos.y));
+        detectBandsFromScanLine();
+        drawCanvas();
+      } else if (draggingHandle === "p2") {
+        p2.x = Math.max(8, Math.min(canvas.width - 8, pos.x));
+        p2.y = Math.max(8, Math.min(canvas.height - 8, pos.y));
+        detectBandsFromScanLine();
+        drawCanvas();
+      } else if (pickingBandIndex !== null) {
+        drawCanvas();
+      }
+    });
+
+    canvas.addEventListener("pointerup", () => {
+      draggingHandle = null;
+    });
+
+    function startEyedropper(idx) {
+      pickingBandIndex = idx;
+      const banner = document.getElementById("eyedropperBanner");
+      banner.classList.add("active");
+      document.getElementById("eyedropperText").textContent =
+        `🎯 Click directly on Band ${idx + 1} in the photo above...`;
+      renderBandControls();
+    }
+
+    function stopEyedropper() {
+      pickingBandIndex = null;
+      pointerPos = null;
+      document.getElementById("eyedropperBanner").classList.remove("active");
+      renderBandControls();
+      drawCanvas();
+    }
+
+    document.getElementById("cancelPickBtn").addEventListener("click", stopEyedropper);
+
+    // Valid colors per slot
+    function getValidColorsForIndex(idx, total) {
+      if (idx === total - 1) return COLOR_TABLE.filter(c => c.tol !== null);
+      if (idx === total - 2) return COLOR_TABLE;
+      if (idx === 0) return COLOR_TABLE.filter(c => c.digit !== null && c.digit !== 0);
+      return COLOR_TABLE.filter(c => c.digit !== null);
+    }
+
+    function renderBandControls() {
+      const container = document.getElementById("bandsContainer");
+      container.innerHTML = "";
+
+      const labels = bandCount === 4
+        ? ["1st Digit", "2nd Digit", "Multiplier", "Tolerance"]
+        : ["1st Digit", "2nd Digit", "3rd Digit", "Multiplier", "Tolerance"];
+
+      for (let i = 0; i < bandCount; i++) {
+        const validColors = getValidColorsForIndex(i, bandCount);
+        if (!validColors.some(c => c.key === selectedBands[i])) {
+          selectedBands[i] = validColors[0].key;
+        }
+        const activeColor = COLOR_TABLE.find(c => c.key === selectedBands[i]);
+
+        const row = document.createElement("div");
+        row.className = "band-row";
+
+        const optionsHtml = validColors.map(c => {
+          let suffix = "";
+          if (i === bandCount - 1) suffix = ` (±${c.tol}%)`;
+          else if (i === bandCount - 2) suffix = ` (×${formatShortMult(c.mult)})`; else suffix = ` (${c.digit})`;
+          return `<option value="${c.key}" ${c.key === selectedBands[i] ? "selected" : ""}>${c.name}${suffix}</option>`;
+        }).join("");
+
+        row.innerHTML = `
+          <label>Band ${i + 1}<br><span style="font-weight:500;font-size:0.72rem;">${labels[i]}</span></label>
+          <div class="band-select-wrap">
+            <span class="swatch-dot" style="background:${activeColor.hex};"></span>
+            <select class="band-select" data-band-idx="${i}">${optionsHtml}</select>
+          </div>
+          <button type="button" class="pick-btn ${pickingBandIndex === i ? "active" : ""}" data-pick-idx="${i}">🎯 Pick</button>
+        `;
+        container.appendChild(row);
+      }
+
+      container.querySelectorAll("select.band-select").forEach(sel => {
+        sel.addEventListener("change", (e) => {
+          const idx = Number(e.target.dataset.bandIdx);
+          selectedBands[idx] = e.target.value;
+          renderBandControls();
+          calculateAndRender();
+        });
+      });
+
+      container.querySelectorAll("button.pick-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const idx = Number(e.target.dataset.pickIdx);
+          if (pickingBandIndex === idx) stopEyedropper();
+          else startEyedropper(idx);
+        });
+      });
+
+      // Raw pixel color chips
+      const rawWrap = document.getElementById("rawChipsContainer");
+      rawWrap.innerHTML = detectedRawColors
+        .map(rgb => `<span class="raw-chip" style="background:rgb(${rgb[0]},${rgb[1]},${rgb[2]});" title="RGB(${rgb.join(",")})"></span>`)
+        .join("");
+    }
+
+    function formatShortMult(m) {
+      if (m >= 1e9) return "1GΩ";
+      if (m >= 1e6) return (m / 1e6) + "MΩ";
+      if (m >= 1e3) return (m / 1e3) + "kΩ";
+      return m + "Ω";
+    }
+
+    function formatOhms(ohms) {
+      if (ohms >= 1e9) return `${+(ohms / 1e9).toFixed(3)} GΩ`; if (ohms >= 1e6) return `${+(ohms / 1e6).toFixed(3)} MΩ`;
+      if (ohms >= 1e3) return `${+(ohms / 1e3).toFixed(3)} kΩ`; return `${+ohms.toFixed(3)} Ω`;
+    }
+
+    function calculateAndRender() {
+      const cols = selectedBands.map(k => COLOR_TABLE.find(c => c.key === k));
+      let base = 0;
+      let mult = 1;
+      let tol = 5;
+
+      if (bandCount === 4) {
+        base = (cols[0].digit || 0) * 10 + (cols[1].digit || 0);
+        mult = cols[2].mult;
+        tol = cols[3].tol ?? 5;
+      } else {
+        base = (cols[0].digit || 0) * 100 + (cols[1].digit || 0) * 10 + (cols[2].digit || 0);
+        mult = cols[3].mult;
+        tol = cols[4].tol ?? 1;
+      }
+
+      const ohms = base * mult;
+      const minOhms = ohms * (1 - tol / 100);
+      const maxOhms = ohms * (1 + tol / 100);
+
+      document.getElementById("resistanceOutput").textContent = `${formatOhms(ohms)} ±${tol}%`;
+      document.getElementById("rangeOutput").textContent =
+        `Acceptable Range: ${formatOhms(minOhms)} –${formatOhms(maxOhms)}`;
+
+      renderResistorSvg(cols);
+    }
+
+    function renderResistorSvg(cols) {
+      const svg = document.getElementById("resistorSvg");
+      const bodyFill = bandCount === 5 ? "#38bdf8" : "#e2c391";
+      const bandPositions = bandCount === 5 ? [108, 134, 160, 186, 238] : [112, 144, 176, 236];
+
+      const bandsMarkup = cols.map((c, idx) =>
+        `<rect x="${bandPositions[idx]}" y="18" width="12" height="54" fill="${c.hex}" />`
+      ).join("");
+
+      svg.innerHTML = `
+        <rect x="10" y="42" width="340" height="6" rx="3" fill="#94a3b8" />
+        <rect x="82" y="18" width="196" height="54" rx="16" fill="${bodyFill}" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" />
+        ${bandsMarkup}
+        <rect x="82" y="18" width="196" height="16" rx="8" fill="rgba(255,255,255,0.2)" />
+      `;
+    }
+
+    function updateModeButtons() {
+      document.getElementById("mode4Btn").classList.toggle("active", bandCount === 4);
+      document.getElementById("mode5Btn").classList.toggle("active", bandCount === 5);
+    }
+
+    document.getElementById("mode4Btn").addEventListener("click", () => {
+      if (bandCount === 4) return;
+      bandCount = 4;
+      selectedBands = [selectedBands[0], selectedBands[1], selectedBands[3] || "red", selectedBands[4] || "gold"];
+      updateModeButtons();
+      renderBandControls();
+      calculateAndRender();
+    });
+
+    document.getElementById("mode5Btn").addEventListener("click", () => {
+      if (bandCount === 5) return;
+      bandCount = 5;
+      selectedBands = [selectedBands[0], selectedBands[1], "black", selectedBands[2] || "brown", selectedBands[3] || "brown"];
+      updateModeButtons();
+      renderBandControls();
+      calculateAndRender();
+    });
+
+    document.getElementById("flipBandsBtn").addEventListener("click", () => {
+      selectedBands.reverse();
+      detectedRawColors.reverse();
+      renderBandControls();
+      calculateAndRender();
+    });
+
+    document.getElementById("rescanBtn").addEventListener("click", () => {
+      detectBandsFromScanLine();
+      drawCanvas();
+    });
+
+    document.querySelectorAll("[data-sample]").forEach(btn => {
+      btn.addEventListener("click", () => loadSampleResistor(btn.dataset.sample));
+    });
+
+    // Initialize with default 4.7k sample
+    loadSampleResistor("4.7k");
+  </script>
+</body>
+</html>
